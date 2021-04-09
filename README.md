@@ -1,5 +1,12 @@
 ## Forked from
 [Source](https://github.com/robsontenorio/laravel-keycloak-guard)
+
+### Install
+```sh
+composer require a-mazalov/laravel-keycloak-guard
+```
+
+
 ### Changes
 ✔️ Features disabling resource checking
 
