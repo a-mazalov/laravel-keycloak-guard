@@ -1,3 +1,14 @@
+## Forked from
+[Source](https://github.com/robsontenorio/laravel-keycloak-guard)
+### Changes
+✔️ Features disabling resource checking
+
+```sh
+# config/keycloak.php
+
+'check_resources' => env('KEYCLOAK_CHECK_RESOURCES', false)
+```
+
 <p align="center">
   <img src="bird.png">  
 </p>
