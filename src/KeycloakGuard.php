@@ -2,6 +2,8 @@
 
 namespace KeycloakGuard;
 
+use Firebase\JWT\ExpiredException;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Contracts\Auth\Guard;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\UserProvider;
@@ -39,6 +41,13 @@ class KeycloakGuard implements Guard
 		try {
 			$this->decodedToken = Token::decode($this->request->bearerToken(), $this->config['realm_public_key']);
 		} catch (\Exception $e) {
+			/*
+			* В случае истекшего токена, обработать исключение и вернуть 401
+			*/
+			if($e instanceof ExpiredException) {
+				throw new AuthenticationException($e->getMessage());
+			}
+
 			throw new TokenException($e->getMessage());
 		}
 
