@@ -9,7 +9,6 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\UserProvider;
 use Illuminate\Http\Request;
 use KeycloakGuard\Exceptions\TokenException;
-use KeycloakGuard\Exceptions\UserNotFoundException;
 use KeycloakGuard\Exceptions\ResourceAccessNotAllowedException;
 
 class KeycloakGuard implements Guard
@@ -44,7 +43,7 @@ class KeycloakGuard implements Guard
 			/*
 			* В случае истекшего токена, обработать исключение и вернуть 401
 			*/
-			if($e instanceof ExpiredException) {
+			if ($e instanceof ExpiredException) {
 				throw new AuthenticationException($e->getMessage());
 			}
 
@@ -131,15 +130,23 @@ class KeycloakGuard implements Guard
 			return false;
 		}
 
-		if($this->config['check_resources']) {
+		if ($this->config['check_resources']) {
 			$this->validateResources();
 		}
 
 		if ($this->config['load_user_from_database']) {
 			$user = $this->provider->retrieveByCredentials($credentials);
+			$tabn = $credentials['tabn'] ?? null;
 
 			if (!$user) {
-				throw new UserNotFoundException("User not found. Credentials: " . json_encode($credentials));
+
+				if (env('HR_USER_KGB') != $tabn) {
+					Log::error("User not found. Credentials: " . json_encode($credentials));
+				}
+
+				// Eсли пользователя не найдено в базе, вернуть пустую модель
+				$class = $this->provider->getModel();
+				$user = new $class();
 			}
 		} else {
 			$class = $this->provider->getModel();
@@ -190,22 +197,59 @@ class KeycloakGuard implements Guard
 	/**
 	 * Check if authenticated user has a especific role into resource
 	 * @param string $resource
-	 * @param string $role
+	 * @param string|array $role
+	 * @param bool $strict - требуется точное совпадение ролей. Только для массивов
 	 * @return bool
 	 */
-	public function hasRole($resource, $role)
+	public function hasRole($resource, $role, $strict = false)
 	{
 		$token_resource_access = (array)$this->decodedToken->resource_access;
-		if (array_key_exists($resource, $token_resource_access)) {
-			$token_resource_values = (array)$token_resource_access[$resource];
 
-			if (
-				array_key_exists('roles', $token_resource_values) &&
-				in_array($role, $token_resource_values['roles'])
-			) {
-				return true;
+		// Проверить наличие ресурса в токене
+		if (!array_key_exists($resource, $token_resource_access)) {
+			return false;
+		}
+
+		$token_resource_values = (array)$token_resource_access[$resource];
+
+		if (array_key_exists('roles', $token_resource_values)) {
+
+			if (is_array($role)) {
+
+				$result = array_intersect($role, $token_resource_values['roles']);
+
+				// В случае необходимости полного совпадения
+				if ($strict) {
+					return count($role) === count($result);
+				}
+
+				// Если есть совпадения
+				return !empty(array_intersect($role, $token_resource_values['roles']));
+			} else {
+				// Если необходимо проверить одну роль
+				return in_array($role, $token_resource_values['roles']);
 			}
 		}
-		return false;
+
+		return true;
+	}
+
+
+	/**
+	 * Проверка роли для ресурса указанного в .env файле.
+	 * 
+	 * @param string|array $role
+	 * @return bool
+	 */
+	public function hasResourceRole($role)
+	{
+		$resourcesInConfig = config('keycloak')['allowed_resources'];
+
+		// Если ресурсы заданы через запятую
+		$resource_array = array_map('trim', explode(',', $resourcesInConfig));
+
+		foreach ($resource_array as $resource) {
+			return $this->hasRole($resource, $role, false);
+		}
 	}
 }
