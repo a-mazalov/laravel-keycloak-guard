@@ -3,6 +3,7 @@
 namespace KeycloakGuard;
 
 use Firebase\JWT\ExpiredException;
+use Firebase\JWT\JWT;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Contracts\Auth\Guard;
 use Illuminate\Contracts\Auth\Authenticatable;
@@ -25,6 +26,10 @@ class KeycloakGuard implements Guard
 		$this->provider = $provider;
 		$this->decodedToken = null;
 		$this->request = $request;
+
+		if($this->config['token_leeway']) {
+			JWT::$leeway = $this->config['token_leeway'];
+		}
 
 		$this->authenticate();
 	}

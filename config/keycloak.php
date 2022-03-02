@@ -13,5 +13,7 @@ return [
 
   'allowed_resources' => env('KEYCLOAK_ALLOWED_RESOURCES', null),
 
-  'check_resources' => env('KEYCLOAK_CHECK_RESOURCES', false)
+  'check_resources' => env('KEYCLOAK_CHECK_RESOURCES', false),
+
+  'token_leeway' => env('KEYCLOAK_TOKEN_LEEWAY', 0)
 ];
