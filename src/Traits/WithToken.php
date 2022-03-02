@@ -37,6 +37,21 @@ trait WithToken
     }
 
     /**
+     * Форматирование открытого ключа для конфигурации laravel
+     *
+     * @param string|array $key
+     * @return void
+     */
+    protected function plainPublicKey($key)
+    {
+      $string = str_replace('-----BEGIN PUBLIC KEY-----', '', $key);
+      $string = trim(str_replace('-----END PUBLIC KEY-----', '', $string));
+      $string = str_replace('\n', '', $string);
+  
+      return $string;
+    }
+
+    /**
      * Добавить данные в токен
      *
      * @param array $payload
@@ -63,6 +78,11 @@ trait WithToken
         $this->buildCustomToken($access);
     }
 
+    /**
+     * Сгенерировать данные в токене
+     *
+     * @return array
+     */
     public function makeFakePayload(): array {
         $faker = Faker\Factory::create();
 
