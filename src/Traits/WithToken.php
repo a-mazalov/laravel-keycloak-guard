@@ -15,9 +15,11 @@ trait WithToken
     /**
      * Сгенерировать токен
      *
+     * @param string $tabn - Cоздать токен с заданым табельным.
+     *  Eсли не указано сгенерирует случайные 6 цифр
      * @return void
      */
-    public function initToken()
+    public function initToken(?string $tabn = null)
     {
         $this->privateKey = openssl_pkey_new(array(
             'digest_alg' => 'sha256',
@@ -31,7 +33,7 @@ trait WithToken
         config(['keycloak.token_principal_attribute' => 'preferred_username']);
         config(['keycloak.append_decoded_token' => true]);
 
-        $this->payload = $this->makeFakePayload();
+        $this->payload = $this->makeFakePayload($tabn);
 
         $this->token = JWT::encode($this->payload, $this->privateKey, 'RS256');
     }
@@ -83,13 +85,13 @@ trait WithToken
      *
      * @return array
      */
-    public function makeFakePayload(): array {
+    public function makeFakePayload(?string $tabn): array {
         $faker = Faker\Factory::create();
 
         $firstName = $faker->firstName();
         $lastName = $faker->lastName();
         $patronymicName = $faker->lastName();
-        $tabn = $faker->numerify('######');
+        $tabnNumber = $tabn ?? $faker->numerify('######');
 
         return [
             "name" => "${firstName} ${lastName}",
@@ -97,8 +99,8 @@ trait WithToken
             "position" => "инженер-программист",
             "given_name" => $firstName,
             "family_name" => $lastName,
-            "username" => $tabn,
-            'preferred_username' => $tabn,
+            "username" => $tabnNumber,
+            'preferred_username' => $tabnNumber,
             'resource_access' => [
                 'test_client' => [
                     "roles" => [
