@@ -170,14 +170,12 @@ class KeycloakGuard implements Guard
 
 				// Если используется сервис аккаунт и он разрешен в env
 				if(in_array($username, $serviceAccounts)) {
-					dump($username, explode(',', $this->config['user_service_account']));
 					$user = $this->getEmptyModel();
 				}
 
 				// Если не выполнился ни один метод, получить пользователя стандарным способом
 				if($user == null) {
 					$user = $this->provider->retrieveByCredentials($credentials);
-					dump("load default");
 				}
 			}
 
