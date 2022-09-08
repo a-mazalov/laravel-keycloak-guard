@@ -5,11 +5,13 @@ namespace KeycloakGuard\Tests;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Hashing\BcryptHasher;
 use Illuminate\Support\Facades\Auth;
+use KeycloakGuard\Exceptions\KeycloakGuardException;
 use KeycloakGuard\Exceptions\ResourceAccessNotAllowedException;
 use KeycloakGuard\Exceptions\TokenException;
 use KeycloakGuard\Exceptions\UserNotFoundException;
 use KeycloakGuard\KeycloakGuard;
 use KeycloakGuard\Tests\Extensions\CustomUserProvider;
+use KeycloakGuard\Tests\Factories\UserFactory;
 use KeycloakGuard\Tests\Models\User;
 
 class AuthenticateTest extends TestCase
@@ -270,5 +272,27 @@ class AuthenticateTest extends TestCase
         $this->assertEquals(Auth::id(), $this->user->id);
 
         $this->json('POST', '/foo/secret', ['api_token' => $this->token]);
+    }
+
+    public function test_service_account()
+    {
+        $this->buildCustomToken([
+            'preferred_username' => 'service-account-2',
+            'resource_access' => ['myapp-backend' => []]
+        ]);
+
+        $this->withKeycloakToken()->json('GET', '/foo/secret')->assertOk();
+    }
+
+    public function test_service_account_not_in_env()
+    {
+        $this->expectException(UserNotFoundException::class);
+
+        $this->buildCustomToken([
+            'preferred_username' => 'service-account-404',
+            'resource_access' => ['myapp-backend' => []]
+        ]);
+
+        $this->withKeycloakToken()->json('GET', '/foo/secret');
     }
 }

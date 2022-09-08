@@ -74,6 +74,7 @@ class TestCase extends Orchestra
             'append_decoded_token' => false,
             'allowed_resources' => 'myapp-backend',
             'ignore_resources_validation' => false,
+            'user_service_account' => 'service-account-1,service-account-2',
         ]);
     }
 

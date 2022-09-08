@@ -19,5 +19,7 @@ return [
 
     'leeway' => env('KEYCLOAK_LEEWAY', 0),
 
-    'input_key' => env('KEYCLOAK_TOKEN_INPUT_KEY', null)
+    'input_key' => env('KEYCLOAK_TOKEN_INPUT_KEY', null),
+
+    'user_service_account' => env('KEYCLOAK_USER_SERVICE_ACCOUNT', null)
 ];
