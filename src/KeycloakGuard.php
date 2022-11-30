@@ -133,6 +133,26 @@ class KeycloakGuard implements Guard
 	}
 
 	/**
+	 * Get username in token
+	 *
+	 * @return string|null
+	 */
+	public function username()
+	{
+		$usernameField = $this->config['token_principal_attribute'];
+
+		if(!$this->decodedToken || !$usernameField) {
+			return null;
+		}
+
+		if(property_exists($this->decodedToken, $usernameField)){
+			return $this->decodedToken->{$usernameField};
+		}
+
+		return null;
+	}
+
+	/**
 	 * Returns full decoded JWT token from athenticated user
 	 *
 	 * @return mixed|null
