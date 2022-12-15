@@ -6,26 +6,10 @@
 composer require a-mazalov/laravel-keycloak-guard
 ```
 
-
-### Changes
-✔️ Features disabling resource checking
-
-```sh
-# config/keycloak.php
-
-'check_resources' => env('KEYCLOAK_CHECK_RESOURCES', false)
-```
-
 <p align="center">
   <img src="bird.png">  
 </p>
 <p align="center">
-&nbsp;
-        <img src="https://img.shields.io/packagist/v/robsontenorio/laravel-keycloak-guard.svg" />
-        <img src="https://img.shields.io/packagist/dt/robsontenorio/laravel-keycloak-guard.svg" />
-      <img src="https://codecov.io/gh/robsontenorio/laravel-keycloak-guard/branch/master/graph/badge.svg?token=8ZpDarpss1"/>
-
-</p>
 
 # Simple Keycloak Guard for Laravel / Lumen
 
@@ -181,6 +165,12 @@ Disables entirely resources validation. It will **ignore** *allowed_resources* c
 
 By default this package **always** will look at first for a `Bearer` token. Additionally, if this option is eneable it will try to get token from this custom request param.
 
+ ✔️ **user_service_account**
+
+*Default is `null`.*
+
+Allowed getEmptyModel without executing a query in the database when ```load_user_from_database = true```
+
 ```php
 // keycloak.php
 'input_key' => 'api_token'
@@ -269,6 +259,14 @@ Simple Keycloak Guard implements `Illuminate\Contracts\Auth\Guard`. So, all Lara
 
 ```php
 $token = Auth::token()  // or Auth::user()->token()
+```
+<br>
+
+`username()`  
+*Returns username from authenticated user.*
+
+```php
+$token = Auth::username()  // or Auth::user()->username()
 ```
 <br>
 
