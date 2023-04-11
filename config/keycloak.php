@@ -21,5 +21,7 @@ return [
 
     'input_key' => env('KEYCLOAK_TOKEN_INPUT_KEY', null),
 
-    'user_service_account' => env('KEYCLOAK_USER_SERVICE_ACCOUNT', null)
+    'user_service_account' => env('KEYCLOAK_USER_SERVICE_ACCOUNT', null),
+
+    'shss_users_allowed' => env('KEYCLOAK_SHSS_USERS_ALLOWED', false)
 ];
