@@ -175,6 +175,7 @@ class KeycloakGuard implements Guard
 		if ($this->config['load_user_from_database']) {
 			$username = $credentials[$this->config['user_provider_credential']] ?? null;
 			$serviceAccounts = array_map('trim', explode(',', $this->config['user_service_account']));
+			$shssAllowed = $this->config['shss_users_allowed'];
 			$user = null;
 
 			$methodOnProvider = $this->config['user_provider_custom_retrieve_method'] ?? null;
@@ -190,6 +191,12 @@ class KeycloakGuard implements Guard
 
 				// Если используется сервис аккаунт и он разрешен в env
 				if(in_array($username, $serviceAccounts)) {
+					$user = $this->getEmptyModel();
+				}
+
+				// Если в проекте есть пользователи Шахтоспецстроя у них есть идентификатор и он начинается с shss
+				if ($shssAllowed && $username !== null && str_starts_with($username, "shss"))
+				{
 					$user = $this->getEmptyModel();
 				}
 
