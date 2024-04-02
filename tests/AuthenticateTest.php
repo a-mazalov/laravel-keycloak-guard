@@ -5,14 +5,12 @@ namespace KeycloakGuard\Tests;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Hashing\BcryptHasher;
 use Illuminate\Support\Facades\Auth;
-use KeycloakGuard\Exceptions\KeycloakGuardException;
 use KeycloakGuard\ActingAsKeycloakUser;
 use KeycloakGuard\Exceptions\ResourceAccessNotAllowedException;
 use KeycloakGuard\Exceptions\TokenException;
 use KeycloakGuard\Exceptions\UserNotFoundException;
 use KeycloakGuard\KeycloakGuard;
 use KeycloakGuard\Tests\Extensions\CustomUserProvider;
-use KeycloakGuard\Tests\Factories\UserFactory;
 use KeycloakGuard\Tests\Models\User;
 
 class AuthenticateTest extends TestCase
@@ -393,7 +391,7 @@ class AuthenticateTest extends TestCase
     {
         config(['keycloak.input_key' => "api_token"]);
 
-        $this->json('GET', '/foo/secret?api_token=' . $this->token);
+        $this->json('GET', '/foo/secret?api_token='.$this->token);
 
         $this->assertEquals(Auth::id(), $this->user->id);
 
@@ -432,6 +430,7 @@ class AuthenticateTest extends TestCase
 
         $this->withKeycloakToken()->json('GET', '/foo/secret');
     }
+
     public function test_with_keycloak_token_trait()
     {
         $this->actingAsKeycloakUser($this->user)->json('GET', '/foo/secret');
@@ -448,4 +447,12 @@ class AuthenticateTest extends TestCase
         $this->assertFalse(Auth::guest());
     }
 
+    public function test_throws_a_exception_when_token_expired()
+    {
+        $this->expectException(TokenException::class);
+
+        $this->buildCustomToken(['exp' => now()->sub(1, 'days')->timestamp]);
+
+        $this->withKeycloakToken()->json('GET', '/foo/secret');
+    }
 }
