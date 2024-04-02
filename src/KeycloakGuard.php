@@ -12,11 +12,11 @@ use KeycloakGuard\Exceptions\UserNotFoundException;
 
 class KeycloakGuard implements Guard
 {
-	private $config;
-	private $user;
-	private $provider;
-	private $decodedToken;
-	private Request $request;
+    protected $config;
+    protected $user;
+    protected $provider;
+    protected $decodedToken;
+    protected Request $request;
 
 	public function __construct(UserProvider $provider, Request $request)
 	{
@@ -29,18 +29,18 @@ class KeycloakGuard implements Guard
 		$this->authenticate();
 	}
 
-	/**
-	 * Decode token, validate and authenticate user
-	 *
-	 * @return mixed
-	 */
-	private function authenticate()
-	{
-		try {
-			$this->decodedToken = Token::decode($this->getTokenForRequest(), $this->config['realm_public_key'], $this->config['leeway']);
-		} catch (\Exception $e) {
-			throw new TokenException($e->getMessage());
-		}
+    /**
+     * Decode token, validate and authenticate user
+     *
+     * @return mixed
+     */
+    protected function authenticate()
+    {
+        try {
+            $this->decodedToken = Token::decode($this->getTokenForRequest(), $this->config['realm_public_key'], $this->config['leeway']);
+        } catch (\Exception $e) {
+            throw new TokenException($e->getMessage());
+        }
 
 		if ($this->decodedToken) {
 			$this->validate([
@@ -228,16 +228,16 @@ class KeycloakGuard implements Guard
 		return new $class();
 	}
 
-	/**
-	 * Validate if authenticated user has a valid resource
-	 *
-	 * @return void
-	 */
-	private function validateResources()
-	{
-		if ($this->config['ignore_resources_validation']) {
-			return;
-		}
+    /**
+     * Validate if authenticated user has a valid resource
+     *
+     * @return void
+     */
+    protected function validateResources()
+    {
+        if ($this->config['ignore_resources_validation']) {
+            return;
+        }
 
 		$token_resource_access = array_keys((array)($this->decodedToken->resource_access ?? []));
 		$allowed_resources = explode(',', $this->config['allowed_resources']);
@@ -247,7 +247,7 @@ class KeycloakGuard implements Guard
 		}
 	}
 
-/**
+	/**
 	 * Check if authenticated user has a especific role into resource
 	 * @param string $resource
 	 * @param string|array $role
@@ -286,6 +286,31 @@ class KeycloakGuard implements Guard
 
 		return true;
 	}
+    
+    /**
+     * Check if authenticated user has a any role into resource
+     * @param string $resource
+     * @param string $role
+     * @return bool
+     */
+    public function hasAnyRole($resource, array $roles)
+    {
+        $token_resource_access = (array)$this->decodedToken->resource_access;
+
+        if (array_key_exists($resource, $token_resource_access)) {
+            $token_resource_values = (array)$token_resource_access[$resource];
+
+            if (array_key_exists('roles', $token_resource_values)) {
+                foreach ($roles as $role) {
+                    if (in_array($role, $token_resource_values['roles'])) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
 
 	/**
 	 * Проверка роли для ресурса указанного в .env файле.
@@ -293,7 +318,7 @@ class KeycloakGuard implements Guard
 	 * @param string|array $role
 	 * @return bool
 	 */
-	public function hasResourceRole($role)
+	public function hasResourceRole($role): bool
 	{
 		$resourcesInConfig = config('keycloak')['allowed_resources'];
 
@@ -303,5 +328,51 @@ class KeycloakGuard implements Guard
 		foreach ($resource_array as $resource) {
 			return $this->hasRole($resource, $role, false);
 		}
+
+		return false;
 	}
+
+    /**
+     * Get scope(s)
+     * @return array
+     */
+    public function scopes(): array
+    {
+        $scopes = $this->decodedToken->scope ?? null;
+
+        if ($scopes) {
+            return explode(' ', $scopes);
+        }
+
+        return [];
+    }
+
+    /**
+     * Check if authenticated user has a especific scope
+     * @param string $scope
+     * @return bool
+     */
+    public function hasScope(string $scope): bool
+    {
+        $scopes = $this->scopes();
+
+        if (in_array($scope, $scopes)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if authenticated user has a any scope
+     * @param array $scopes
+     * @return bool
+     */
+    public function hasAnyScope(array $scopes): bool
+    {
+        return count(array_intersect(
+            $this->scopes(),
+            is_string($scopes) ? [$scopes] : $scopes
+        )) > 0;
+    }
 }

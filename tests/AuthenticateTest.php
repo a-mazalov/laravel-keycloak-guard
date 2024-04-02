@@ -6,6 +6,7 @@ use Illuminate\Auth\AuthenticationException;
 use Illuminate\Hashing\BcryptHasher;
 use Illuminate\Support\Facades\Auth;
 use KeycloakGuard\Exceptions\KeycloakGuardException;
+use KeycloakGuard\ActingAsKeycloakUser;
 use KeycloakGuard\Exceptions\ResourceAccessNotAllowedException;
 use KeycloakGuard\Exceptions\TokenException;
 use KeycloakGuard\Exceptions\UserNotFoundException;
@@ -16,6 +17,8 @@ use KeycloakGuard\Tests\Models\User;
 
 class AuthenticateTest extends TestCase
 {
+    use ActingAsKeycloakUser;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -212,6 +215,140 @@ class AuthenticateTest extends TestCase
         $this->assertFalse(Auth::hasRole('myapp-backend', 'myapp-frontend-role1'));
     }
 
+    public function test_check_user_has_any_role_in_resource()
+    {
+        $this->buildCustomToken([
+            'resource_access' => [
+                'myapp-backend' => [
+                    'roles' => [
+                        'myapp-backend-role1',
+                        'myapp-backend-role2'
+                    ]
+                ],
+                'myapp-frontend' => [
+                    'roles' => [
+                        'myapp-frontend-role1',
+                        'myapp-frontend-role2'
+                    ]
+                ]
+            ]
+        ]);
+
+        $this->withKeycloakToken()->json('GET', '/foo/secret');
+        $this->assertTrue(Auth::hasAnyRole('myapp-backend', ['myapp-backend-role1', 'myapp-backend-role3']));
+    }
+
+    public function test_check_user_no_has_any_role_in_resource()
+    {
+        $this->buildCustomToken([
+            'resource_access' => [
+                'myapp-backend' => [
+                    'roles' => [
+                        'myapp-backend-role1',
+                        'myapp-backend-role2'
+                    ]
+                ],
+                'myapp-frontend' => [
+                    'roles' => [
+                        'myapp-frontend-role1',
+                        'myapp-frontend-role2'
+                    ]
+                ]
+            ]
+        ]);
+
+        $this->withKeycloakToken()->json('GET', '/foo/secret');
+        $this->assertFalse(Auth::hasAnyRole('myapp-backend', ['myapp-backend-role3', 'myapp-backend-role4']));
+    }
+
+    public function test_prevent_cross_roles_resources_with_any_role()
+    {
+        $this->buildCustomToken([
+            'resource_access' => [
+                'myapp-backend' => [
+                    'roles' => [
+                        'myapp-backend-role1',
+                        'myapp-backend-role2'
+                    ]
+                ],
+                'myapp-frontend' => [
+                    'roles' => [
+                        'myapp-frontend-role1',
+                        'myapp-frontend-role2'
+                    ]
+                ]
+            ]
+        ]);
+
+        $this->withKeycloakToken()->json('GET', '/foo/secret');
+        $this->assertFalse(Auth::hasAnyRole('myapp-backend', ['myapp-frontend-role1', 'myapp-frontend-role2']));
+    }
+
+    public function test_check_user_has_scope()
+    {
+        $this->buildCustomToken([
+            'scope' => 'scope-a scope-b scope-c',
+        ]);
+
+        $this->withKeycloakToken()->json('GET', '/foo/secret');
+        $this->assertTrue(Auth::hasScope('scope-a'));
+    }
+
+    public function test_check_user_no_has_scope()
+    {
+        $this->buildCustomToken([
+            'scope' => 'scope-a scope-b scope-c',
+        ]);
+
+        $this->withKeycloakToken()->json('GET', '/foo/secret');
+        $this->assertFalse(Auth::hasScope('scope-d'));
+    }
+
+    public function test_check_user_has_any_scope()
+    {
+        $this->buildCustomToken([
+            'scope' => 'scope-a scope-b scope-c',
+        ]);
+
+        $this->withKeycloakToken()->json('GET', '/foo/secret');
+        $this->assertTrue(Auth::hasAnyScope(['scope-a', 'scope-c']));
+    }
+
+    public function test_check_user_no_has_any_scope()
+    {
+        $this->buildCustomToken([
+            'scope' => 'scope-a scope-b scope-c',
+        ]);
+
+        $this->withKeycloakToken()->json('GET', '/foo/secret');
+        $this->assertFalse(Auth::hasAnyScope(['scope-f', 'scope-k']));
+    }
+
+    public function test_check_user_scopes()
+    {
+        $this->buildCustomToken([
+            'scope' => 'scope-a scope-b scope-c',
+        ]);
+
+        $this->withKeycloakToken()->json('GET', '/foo/secret');
+
+        $expectedValues = ["scope-a", "scope-b", "scope-c"];
+        foreach ($expectedValues as $value) {
+            $this->assertContains($value, Auth::scopes());
+        }
+        $this->assertCount(count($expectedValues), Auth::scopes());
+    }
+
+    public function test_check_user_no_scopes()
+    {
+        $this->buildCustomToken([
+            'scope' => null,
+        ]);
+
+        $this->withKeycloakToken()->json('GET', '/foo/secret');
+        $this->assertCount(0, Auth::scopes());
+    }
+
     public function test_custom_user_retrieve_method()
     {
         config(['keycloak.user_provider_custom_retrieve_method' => 'custom_retrieve']);
@@ -256,7 +393,7 @@ class AuthenticateTest extends TestCase
     {
         config(['keycloak.input_key' => "api_token"]);
 
-        $this->json('GET', '/foo/secret?api_token='.$this->token);
+        $this->json('GET', '/foo/secret?api_token=' . $this->token);
 
         $this->assertEquals(Auth::id(), $this->user->id);
 
@@ -295,4 +432,20 @@ class AuthenticateTest extends TestCase
 
         $this->withKeycloakToken()->json('GET', '/foo/secret');
     }
+    public function test_with_keycloak_token_trait()
+    {
+        $this->actingAsKeycloakUser($this->user)->json('GET', '/foo/secret');
+
+        $this->assertEquals($this->user->username, Auth::user()->username);
+    }
+
+    public function test_acting_as_keycloak_user_trait_without_user()
+    {
+        $this->actingAsKeycloakUser()->json('GET', '/foo/secret');
+
+        $this->assertTrue(Auth::hasUser());
+
+        $this->assertFalse(Auth::guest());
+    }
+
 }
