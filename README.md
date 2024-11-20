@@ -58,25 +58,65 @@ This package helps you authenticate users on a Laravel API based on JWT tokens g
 
 # Install
 
-### Laravel / Lumen
-
 Require the package
 
 ```
 composer require robsontenorio/laravel-keycloak-guard
 ```
 
-### Lumen only
-
-Register the provider in your boostrap app file `bootstrap/app.php`
-
-Add the following line in the "Register Service Providers" section at the bottom of the file.
+**If you are using Lumen**, register the provider in your boostrap app file `bootstrap/app.php`.  
+For facades, uncomment `$app->withFacades();` in your boostrap app file `bootstrap/app.php`
 
 ```php
 $app->register(\KeycloakGuard\KeycloakGuardServiceProvider::class);
 ```
 
-For facades, uncomment `$app->withFacades();` in your boostrap app file `bootstrap/app.php`
+### Example configuration (.env)
+
+```.env
+KEYCLOAK_REALM_PUBLIC_KEY=MIIBIj...         # Get it on Keycloak admin web console.
+KEYCLOAK_LOAD_USER_FROM_DATABASE=false      # You can opt to not load user from database, and use that one provided from JWT token.
+KEYCLOAK_APPEND_DECODED_TOKEN=true          # Append the token info to user object.
+KEYCLOAK_ALLOWED_RESOURCES=my-api           # The JWT token must contain this resource `my-api`.
+KEYCLOAK_LEEWAY=60                          # Optional, but solve some weird issues with timestamps from JWT token.
+```
+
+
+### Auth Guard
+
+Changes on `config/auth.php`
+
+```php
+'defaults' => [
+    'guard' => 'api',                 # <-- This
+    'passwords' => 'users',
+],    
+'guards' => [
+    'api' => [
+        'driver' => 'keycloak',       # <-- This
+        'provider' => 'users',
+    ],
+],
+```
+
+### Routes
+
+Just protect some endpoints on `routes/api.php` and **you are done!**
+
+```php
+// public endpoints
+Route::get('/hello', function () {
+    return ':)';
+});
+
+// protected endpoints
+Route::group(['middleware' => 'auth:api'], function () {
+    Route::get('/protected-endpoint', 'SecretController@index');
+
+    // more endpoints ...
+});
+```
+
 
 # Configuration
 
@@ -96,7 +136,13 @@ _Required._
 
 The Keycloak Server realm public key (string).
 
-> How to get realm public key? Click on "Realm Settings" > "Keys" > "Algorithm RS256" Line > "Public Key" Button
+> How to get realm public key? Click on "Realm Settings" > "Keys" > "Algorithm RS256 (or defined under token_encryption_algorithm configuration)" Line > "Public Key" Button
+
+✔️ **token_encryption_algorithm**
+
+_Default is `RS256`._
+
+The JWT token encryption algorithm used by Keycloak (string).
 
 ✔️ **load_user_from_database**
 
@@ -175,64 +221,6 @@ GET  $this->get("/foo/secret?api_token=xxxxx")
 POST $this->post("/foo/secret", ["api_token" => "xxxxx"])
 ```
 
-## Laravel Auth
-
-Changes on `config/auth.php`
-
-```php
-...
-'defaults' => [
-        'guard' => 'api', # <-- For sure, i`m building an API
-        'passwords' => 'users',
-    ],
-
-    ....
-
-    'guards' => [
-        # <!-----
-        #     Make sure your "api" guard looks like this.
-        #     Newer Laravel versions just removed this config block.
-        #  ---->
-        'api' => [
-            'driver' => 'keycloak',
-            'provider' => 'users',
-        ],
-    ],
-```
-
-## Laravel Routes
-
-Just protect some endpoints on `routes/api.php` and you are done!
-
-```php
-// public endpoints
-Route::get('/hello', function () {
-    return ':)';
-});
-
-// protected endpoints
-Route::group(['middleware' => 'auth:api'], function () {
-    Route::get('/protected-endpoint', 'SecretController@index');
-    // more endpoints ...
-});
-```
-
-## Lumen Routes
-
-Just protect some endpoints on `routes/web.php` and you are done!
-
-```php
-// public endpoints
-$router->get('/hello', function () {
-    return ':)';
-});
-
-// protected endpoints
-$router->group(['middleware' => 'auth'], function () {
-    $router->get('/protected-endpoint', 'SecretController@index');
-    // more endpoints ...
-});
-```
 
 # API
 
@@ -339,9 +327,9 @@ Auth::hasAnyScope(['scope-a', 'scope-d']) // true
 Auth::hasAnyScope(['scope-f', 'scope-k']) // false
 ```
 
-# Acting as a Keycloak user in tests
+## Acting as a Keycloak user in tests
 
-As an equivelant feature like `$this->actingAs($user)` in Laravel, with this package you can use `KeycloakGuard\ActingAsKeycloakUser` trait in your test class and then use `actingAsKeycloakUser()` method to act as a user and somehow skip the Keycloak auth:
+As an equivalent feature like `$this->actingAs($user)` in Laravel, with this package you can use `KeycloakGuard\ActingAsKeycloakUser` trait in your test class and then use `actingAsKeycloakUser()` method to act as a user and somehow skip the Keycloak auth:
 
 ```php
 use KeycloakGuard\ActingAsKeycloakUser;
@@ -355,6 +343,52 @@ public test_a_protected_route()
 ```
 
 If you are not using `keycloak.load_user_from_database` option, set `keycloak.preferred_username` with a valid `preferred_username` for tests.
+
+You can also specify exact expectations for the token payload by passing the payload array in the second argument:
+
+```php
+use KeycloakGuard\ActingAsKeycloakUser;
+
+public test_a_protected_route()
+{
+    $this->actingAsKeycloakUser($user, [
+        'aud' => 'account',
+        'exp' => 1715926026,
+        'iss' => 'https://localhost:8443/realms/master'
+    ])->getJson('/api/somewhere')
+      ->assertOk();
+}
+```
+`$user` argument receives a string identifier or
+an Eloquent model, identifier of which is expected to be the property referred in **user_provider_credential** config.
+Whatever you pass in the payload will override default claims,
+which includes `aud`, `iat`, `exp`, `iss`, `azp`, `resource_access` and either `sub` or `preferred_username`,
+depending on **token_principal_attribute** config.
+
+Alternatively, payload can be provided in a class property, so it can be reused across multiple tests:
+
+```php
+use KeycloakGuard\ActingAsKeycloakUser;
+
+protected $tokenPayload = [
+    'aud' => 'account',
+    'exp' => 1715926026,
+    'iss' => 'https://localhost:8443/realms/master'
+];
+
+public test_a_protected_route()
+{
+    $payload = [
+        'exp' => 1715914352
+    ];
+    $this->actingAsKeycloakUser($user, $payload)
+        ->getJson('/api/somewhere')
+        ->assertOk();
+}
+```
+
+Priority is given to the claims in passed as an argument, so they will override ones in the class property.
+`$user` argument has the highest priority over the claim referred in **token_principal_attribute** config.
 
 # Contribute
 

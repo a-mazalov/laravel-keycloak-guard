@@ -2,6 +2,7 @@
 
 namespace KeycloakGuard\Tests;
 
+use Firebase\JWT\JWT;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Hashing\BcryptHasher;
 use Illuminate\Support\Facades\Auth;
@@ -11,7 +12,9 @@ use KeycloakGuard\Exceptions\TokenException;
 use KeycloakGuard\Exceptions\UserNotFoundException;
 use KeycloakGuard\KeycloakGuard;
 use KeycloakGuard\Tests\Extensions\CustomUserProvider;
+use KeycloakGuard\Tests\Factories\UserFactory;
 use KeycloakGuard\Tests\Models\User;
+use KeycloakGuard\Token;
 
 class AuthenticateTest extends TestCase
 {
@@ -431,11 +434,65 @@ class AuthenticateTest extends TestCase
         $this->withKeycloakToken()->json('GET', '/foo/secret');
     }
 
-    public function test_with_keycloak_token_trait()
+    public function test_acting_as_keycloak_user_trait()
     {
         $this->actingAsKeycloakUser($this->user)->json('GET', '/foo/secret');
 
         $this->assertEquals($this->user->username, Auth::user()->username);
+        $token = Token::decode(request()->bearerToken(), config('keycloak.realm_public_key'), config('keycloak.leeway'), config('keycloak.token_encryption_algorithm'));
+        $this->assertNotNull($token->iat);
+        $this->assertNotNull($token->exp);
+        $this->assertNotNull($token->iss);
+        $this->assertNotNull($token->azp);
+        $this->assertNotNull($token->aud);
+    }
+
+    public function test_acting_as_keycloak_user_trait_with_username()
+    {
+        $this->actingAsKeycloakUser($this->user->username)->json('GET', '/foo/secret');
+
+        $this->assertEquals($this->user->username, Auth::user()->username);
+        $token = Token::decode(request()->bearerToken(), config('keycloak.realm_public_key'), config('keycloak.leeway'), config('keycloak.token_encryption_algorithm'));
+        $this->assertNotNull($token->iat);
+        $this->assertNotNull($token->exp);
+    }
+
+    /**
+     * @dataProvider scopeProvider
+     *
+     * @return void
+     */
+    public function test_acting_as_keycloak_user_trait_with_custom_payload(string $scope)
+    {
+        UserFactory::new()->create([
+            'username' => 'test_username',
+        ]);
+        $payload = [
+            'sub' => 'test_sub',
+            'aud' => 'test_aud',
+            'preferred_username' => 'test_username',
+            'iat' => 12345,
+            'exp' => 9999999999999,
+        ];
+
+        $arg = [];
+
+        if ($scope === 'class') {
+            $this->jwtPayload = $payload;
+        } else {
+            $this->jwtPayload['sub'] = 'should_be_overwritten';
+            $arg = $payload;
+        }
+
+        $this->actingAsKeycloakUser(payload: $arg)->json('GET', '/foo/secret');
+
+        $this->assertEquals('test_username', Auth::user()->username);
+        $token = Token::decode(request()->bearerToken(), config('keycloak.realm_public_key'), config('keycloak.leeway'), config('keycloak.token_encryption_algorithm'));
+        $this->assertEquals(12345, $token->iat);
+        $this->assertEquals(9999999999999, $token->exp);
+        $this->assertEquals('test_sub', $token->sub);
+        $this->assertEquals('test_aud', $token->aud);
+        $this->assertTrue(config('keycloak.load_user_from_database'));
     }
 
     public function test_acting_as_keycloak_user_trait_without_user()
@@ -454,5 +511,29 @@ class AuthenticateTest extends TestCase
         $this->buildCustomToken(['exp' => now()->sub(1, 'days')->timestamp]);
 
         $this->withKeycloakToken()->json('GET', '/foo/secret');
+    }
+    
+    public function test_it_decodes_token_with_the_configured_encryption_algorithm()
+    {
+        $this->prepareCredentials('ES256', [
+            'private_key_type' => OPENSSL_KEYTYPE_EC,
+            'curve_name' => 'prime256v1'
+        ]);
+
+        config([
+            'keycloak.token_encryption_algorithm' => 'ES256',
+            'keycloak.realm_public_key' => Token::plainPublicKey($this->publicKey)
+        ]);
+
+        $this->withKeycloakToken()->json('GET', '/foo/secret');
+        $this->assertEquals($this->user->username, Auth::user()->username);
+    }
+
+    public function scopeProvider(): array
+    {
+        return [
+            ['local'],
+            ['class'],
+        ];
     }
 }
