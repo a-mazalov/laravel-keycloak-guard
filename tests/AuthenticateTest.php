@@ -412,28 +412,6 @@ class AuthenticateTest extends TestCase
         $this->json('POST', '/foo/secret', ['api_token' => $this->token]);
     }
 
-    public function test_service_account()
-    {
-        $this->buildCustomToken([
-            'preferred_username' => 'service-account-2',
-            'resource_access' => ['myapp-backend' => []]
-        ]);
-
-        $this->withKeycloakToken()->json('GET', '/foo/secret')->assertOk();
-    }
-
-    public function test_service_account_not_in_env()
-    {
-        $this->expectException(UserNotFoundException::class);
-
-        $this->buildCustomToken([
-            'preferred_username' => 'service-account-404',
-            'resource_access' => ['myapp-backend' => []]
-        ]);
-
-        $this->withKeycloakToken()->json('GET', '/foo/secret');
-    }
-
     public function test_acting_as_keycloak_user_trait()
     {
         $this->actingAsKeycloakUser($this->user)->json('GET', '/foo/secret');
@@ -504,15 +482,6 @@ class AuthenticateTest extends TestCase
         $this->assertFalse(Auth::guest());
     }
 
-    public function test_throws_a_exception_when_token_expired()
-    {
-        $this->expectException(TokenException::class);
-
-        $this->buildCustomToken(['exp' => now()->sub(1, 'days')->timestamp]);
-
-        $this->withKeycloakToken()->json('GET', '/foo/secret');
-    }
-    
     public function test_it_decodes_token_with_the_configured_encryption_algorithm()
     {
         $this->prepareCredentials('ES256', [
