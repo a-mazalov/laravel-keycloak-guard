@@ -2,7 +2,6 @@
 
 namespace KeycloakGuard\Tests;
 
-use Firebase\JWT\JWT;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Hashing\BcryptHasher;
 use Illuminate\Support\Facades\Auth;
@@ -394,7 +393,7 @@ class AuthenticateTest extends TestCase
     {
         config(['keycloak.input_key' => "api_token"]);
 
-        $this->json('GET', '/foo/secret?api_token=' . $this->token);
+        $this->json('GET', '/foo/secret?api_token='.$this->token);
 
         $this->assertEquals(Auth::id(), $this->user->id);
 
@@ -496,6 +495,21 @@ class AuthenticateTest extends TestCase
 
         $this->withKeycloakToken()->json('GET', '/foo/secret');
         $this->assertEquals($this->user->username, Auth::user()->username);
+    }
+
+    public function test_throws_a_exception_with_expired_token()
+    {
+        $this->expectException(AuthenticationException::class);
+
+        $this->buildCustomToken([
+            'exp' => time() - 120,   // time ahead in the future
+            'preferred_username' => 'johndoe',
+            'resource_access' => ['myapp-backend' => []]
+        ]);
+
+        $this->withKeycloakToken()->json('GET', '/foo/secret');
+
+        $this->assertTrue(true);
     }
 
     public function scopeProvider(): array
