@@ -4,13 +4,14 @@ namespace KeycloakGuard\Traits;
 
 use Firebase\JWT\JWT;
 use Faker;
+use OpenSSLAsymmetricKey;
 
 trait WithToken
 {
-    protected $token;
-    protected $publicKey;
-    protected $payload;
-    protected $privateKey;
+    protected string $token;
+    protected string $publicKey;
+    protected mixed $payload;
+    protected OpenSSLAsymmetricKey $privateKey;
 
     /**
      * Сгенерировать токен
@@ -46,11 +47,11 @@ trait WithToken
      */
     protected function plainPublicKey($key)
     {
-      $string = str_replace('-----BEGIN PUBLIC KEY-----', '', $key);
-      $string = trim(str_replace('-----END PUBLIC KEY-----', '', $string));
-      $string = str_replace('\n', '', $string);
-  
-      return $string;
+        $string = str_replace('-----BEGIN PUBLIC KEY-----', '', $key);
+        $string = trim(str_replace('-----END PUBLIC KEY-----', '', $string));
+        $string = str_replace('\n', '', $string);
+
+        return $string;
     }
 
     /**
@@ -85,7 +86,8 @@ trait WithToken
      *
      * @return array
      */
-    public function makeFakePayload(?string $tabn): array {
+    public function makeFakePayload(?string $tabn): array
+    {
         $faker = Faker\Factory::create();
 
         $firstName = $faker->firstName();
@@ -94,8 +96,8 @@ trait WithToken
         $tabnNumber = $tabn ?? $faker->numerify('######');
 
         return [
-            "name" => "${firstName} ${lastName}",
-            "fullName" => "${firstName} ${lastName} ${patronymicName}",
+            "name" => "{$firstName} {$lastName}",
+            "fullName" => "{$firstName} {$lastName} {$patronymicName}",
             "position" => "инженер-программист",
             "given_name" => $firstName,
             "family_name" => $lastName,
